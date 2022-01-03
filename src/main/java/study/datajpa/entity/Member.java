@@ -12,7 +12,7 @@ import static javax.persistence.FetchType.*;
 @ToString(of = {"id", "username", "age"}) // 연관 관계 필드는 ToString에서 제외하는 것을 권장 (서로 참조하여 무한 루프 발생 가능)
 @NamedEntityGraph(name = "Member.all",
         attributeNodes = @NamedAttributeNode("team"))
-public class Member {
+public class Member extends BaseEntity {
 
     @Id
     @GeneratedValue

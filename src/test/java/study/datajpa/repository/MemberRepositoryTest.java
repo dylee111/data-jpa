@@ -3,10 +3,7 @@ package study.datajpa.repository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 import study.datajpa.dto.MemberDto;
@@ -212,5 +209,118 @@ public class MemberRepositoryTest {
             System.out.println("-> member.teamClass = " + member.getTeam().getClass());
             System.out.println("-> member.team = " + member.getTeam().getName());
         }
+    }
+
+    @Test
+    public void queryHint() {
+        //GIVEN
+        memberRepository.save(new Member("MemberA", 10));
+        em.flush();
+        em.clear();
+
+        //WHEN
+        Member memberA = memberRepository.findReadOnlyByUsername("MemberA");
+        memberA.setUsername("NEW_MEMBER");
+
+        em.flush(); // UPDATE 쿼리 실행이 되지 않는다.
+    }
+
+    @Test
+    public void 커스텀_레포지토리_테스트() {
+        // MemberRepositoryCustom에 정의된 메서드
+        System.out.println("사용자 정의 메서드 = " + memberRepository.findMemberCustom().getClass());
+    }
+
+    @Test
+    public void JpaAuditingTest() throws Exception {
+        //Given
+        Member memberA = new Member("MemberA");
+        memberRepository.save(memberA); // @PrePersist
+
+        Thread.sleep(100);
+        memberA.setUsername("NEW_MEMBER");
+
+        em.flush(); // @PreUpdate
+        em.clear();
+
+        // When
+        Member findMember = memberRepository.findById(memberA.getId()).get();
+        System.out.println("findMember.등록일자 = " + findMember.getCreatedDate());
+        System.out.println("findMember.수정일자 = " + findMember.getLastModifiedDate());
+        System.out.println("findMember.등록자 = " + findMember.getCreatedBy());
+        System.out.println("findMember.수정자 = " + findMember.getLastModifiedBy());
+    }
+
+    @Test
+    public void queryByExample() {
+        // Given
+        Team teamA = new Team("TeamA");
+        em.persist(teamA);
+
+        em.persist(new Member("MemberA", 10, teamA));
+        em.persist(new Member("MemberB", 10, teamA));
+
+        em.flush();
+
+        // When
+        // Probe 생성
+        Member member = new Member("MemberA");
+        Team team = new Team("TeamA");
+        member.setTeam(team);
+
+        ExampleMatcher matcher = ExampleMatcher.matching()
+                .withIgnorePaths("age");
+
+        Example<Member> example = Example.of(member, matcher);
+
+        List<Member> result = memberRepository.findAll(example);
+
+        // Then
+        assertThat(result.get(0).getUsername()).isEqualTo("MemberA");
+    }
+
+    @Test
+    public void projectionTest() {
+        // Given
+        Team teamA = new Team("TeamA");
+        em.persist(teamA);
+
+        em.persist(new Member("MemberA", 10, teamA));
+        em.persist(new Member("MemberB", 10, teamA));
+
+        em.flush();
+        em.clear();
+
+        // When
+        List<ProjectionDto> member = memberRepository.findProjectionByUsername("MemberA", ProjectionDto.class);
+        List<UsernameProjection> member2 = memberRepository.findProjectionByUsername("MemberA", UsernameProjection.class);
+
+        // Then
+        for (ProjectionDto projectionDto : member) {
+            System.out.println("projectionDto.getUsername() = " + projectionDto.getUsername());
+        }
+    }
+
+    @Test
+    public void nativeQueryTest() {
+        // Given
+        Team teamA = new Team("TeamA");
+        em.persist(teamA);
+
+        em.persist(new Member("MemberA", 10, teamA));
+        em.persist(new Member("MemberB", 10, teamA));
+
+        em.flush();
+        em.clear();
+
+        // When
+        Page<MemberProjection> page = memberRepository.findByNativeQuery(PageRequest.of(0, 10));
+        // Then
+        for (MemberProjection memberProjection : page) {
+            System.out.println("memberProjection.getTeamName() = " + memberProjection.getTeamName());
+            System.out.println("memberProjection.getUsername() = " + memberProjection.getUsername());
+        }
+            System.out.println("Total Element : " + page.getTotalElements());
+            System.out.println("Total Page : " + page.getTotalPages());
     }
 }

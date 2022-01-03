@@ -3,19 +3,17 @@ package study.datajpa.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import study.datajpa.dto.MemberDto;
 import study.datajpa.entity.Member;
 
 import javax.persistence.Entity;
+import javax.persistence.QueryHint;
 import java.util.Collection;
 import java.util.List;
 
-public interface MemberRepository extends JpaRepository<Member, Long> {
+public interface MemberRepository extends JpaRepository<Member, Long>, MemberRepositoryCustom {
 
     MemberDto findDtoByUsername(String username);
 
@@ -26,7 +24,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("SELECT m FROM Member m WHERE m.username= ?1 AND m.age=?2")
     List<MemberDto> findMemberPosition(String username, int age);
 
-    @Query("SELECT new study.datajpa.dto.MemberDto(m.id, m.username, m.age, t.name) FROM Member m JOIN m.team t ")
+    @Query("SELECT new study.datajpa.dto.MemberDto(m.id, m.username, m.age, t.name) " +
+            "FROM Member m JOIN m.team t ")
     List<MemberDto> findMemberDto();
 
     @Query("SELECT m FROM Member m " +
@@ -53,7 +52,21 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     @Query("SELECT m FROM Member m ")
     List<Member> findMemberEntityGraph();
 
-    //메서드 이름으로 쿼리에서 특히 편리하다.
+    //메서드 이름으로 쿼리에서 특히 편리
     @EntityGraph(attributePaths = {"team"})
     List<Member> findEntityGraphByUsername(String username);
+
+    @QueryHints(value = @QueryHint(name = "org.hibernate.readOnly", value = "true"))
+    Member findReadOnlyByUsername(String username);
+
+    /*
+    * Projection
+    */
+    <T> List<T> findProjectionByUsername(String username, Class<T> type);
+
+    @Query(value = "SELECT m.member_id as id, m.username, t.name as TeamName " +
+            "FROM member m LEFT JOIN team t ",
+            countQuery = "SELECT COUNT(*) FROM member ",
+            nativeQuery = true)
+    Page<MemberProjection> findByNativeQuery(Pageable pageable);
 }
